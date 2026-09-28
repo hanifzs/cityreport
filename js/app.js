@@ -103,7 +103,7 @@ window.drawMapMarkers=()=>{
 };
 function initMap(el,list,clickCb){
   if(!window.L)return;const map=L.map(el).setView([-6.205,106.826],12);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"© Esri · OpenStreetMap contributors"}).addTo(map);
   const layer=L.layerGroup().addTo(map);MAPS.markers=layer;
   (list||[]).forEach(r=>{const m=L.circleMarker([r.lat,r.lng],{radius:8,color:"#fff",weight:2,fillColor:{Menunggu:"#6B7280",Terverifikasi:"#2563EB",Dikerjakan:"#EA580C",Selesai:"#059669",Ditolak:"#DC2626"}[r.status]||"#666",fillOpacity:.95});m.bindPopup(`<b>${esc(r.title)}</b><br>${r.ticket}<br><a href="#/report/${r.ticket}">Detail →</a>`);m.addTo(layer);});
   if(clickCb){let mk=null;map.on("click",e=>{if(mk)map.removeLayer(mk);mk=L.marker(e.latlng,{draggable:true}).addTo(map);mk.on("dragend",()=>clickCb(mk.getLatLng(),mk));clickCb(e.latlng,mk);});}

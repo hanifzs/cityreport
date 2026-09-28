@@ -15,7 +15,7 @@ export default function Create() {
 
   useEffect(() => {
     const map = L.map('cmap').setView([-6.205, 106.826], 12);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri · OpenStreetMap contributors' }).addTo(map);
     let mk: L.Marker | null = null;
     map.on('click', e => {
       if (mk) map.removeLayer(mk);

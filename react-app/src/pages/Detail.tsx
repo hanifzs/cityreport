@@ -32,7 +32,7 @@ export default function Detail() {
   useEffect(() => {
     if (!r || !document.getElementById('dmap')) return;
     const map = L.map('dmap').setView([r.lat, r.lng], 15);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri · OpenStreetMap contributors' }).addTo(map);
     L.marker([r.lat, r.lng]).addTo(map);
     return () => { map.remove(); };
   }, [r?.id]);

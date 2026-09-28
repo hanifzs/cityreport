@@ -9,7 +9,7 @@ export function useLeafletMap(elId: string, center: [number, number] = [-6.205, 
     const el = document.getElementById(elId);
     if (!el || ref.current) return;
     const map = L.map(el).setView(center, zoom);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri · OpenStreetMap contributors' }).addTo(map);
     ref.current = map;
     setTimeout(() => map.invalidateSize(), 300);
     return () => { map.remove(); ref.current = null; };
