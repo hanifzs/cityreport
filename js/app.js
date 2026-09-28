@@ -89,7 +89,7 @@ function vMap(){
   <div class="flex flex-wrap gap-2 text-xs font-bold mb-3">${Object.entries({Menunggu:"#6B7280",Terverifikasi:"#2563EB",Dikerjakan:"#EA580C",Selesai:"#059669",Ditolak:"#DC2626"}).map(([k,c])=>`<span class="badge" style="background:${c}22;color:${c};border:1px solid ${c}">● ${stLabel(k)}</span>`).join("")}</div>
   <div class="card p-3 mb-3 flex flex-col lg:flex-row gap-2"><input id="mq" class="input" placeholder="${t("searchPh")}"><select id="mc" class="input lg:w-52"><option value="">${t("allCat")}</option>${CATS.map(c=>`<option value="${c.id}">${c.icon} ${Store.lang()==="en"?c.en_label:c.id_label}</option>`).join("")}</select>
   <select id="ms" class="input lg:w-52"><option value="">${t("allStatus")}</option>${["Menunggu","Terverifikasi","Dikerjakan","Selesai","Ditolak"].map(s=>`<option value="${s}">${stLabel(s)}</option>`).join("")}</select>
-  <button class="btn btn-primary btn-sm" onclick="drawMapMarkers()">🔍</button></div>
+  <button class="btn btn-primary btn-sm" onclick="drawMapMarkers()">🔍</button><button class="btn btn-outline btn-sm" onclick="locateMe('mainMap',false)">📍</button></div>
   <div class="grid lg:grid-cols-3 gap-4"><div class="card p-2 lg:col-span-2"><div id="mainMap" style="height:480px"></div></div>
   <div class="card p-4 max-h-[520px] overflow-auto"><h3 class="font-bold mb-2">📋 Laporan (<span id="mapCount"></span>)</h3><div id="mapList" class="flex flex-col gap-2"></div></div></div></div>`;
 }
@@ -103,12 +103,39 @@ window.drawMapMarkers=()=>{
 };
 function initMap(el,list,clickCb){
   if(!window.L)return;const map=L.map(el).setView([-6.205,106.826],12);
+  MAPS.all=MAPS.all||{};MAPS.all[el]=map;
   L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"© Esri · OpenStreetMap contributors"}).addTo(map);
   const layer=L.layerGroup().addTo(map);MAPS.markers=layer;
   (list||[]).forEach(r=>{const m=L.circleMarker([r.lat,r.lng],{radius:8,color:"#fff",weight:2,fillColor:{Menunggu:"#6B7280",Terverifikasi:"#2563EB",Dikerjakan:"#EA580C",Selesai:"#059669",Ditolak:"#DC2626"}[r.status]||"#666",fillOpacity:.95});m.bindPopup(`<b>${esc(r.title)}</b><br>${r.ticket}<br><a href="#/report/${r.ticket}">Detail →</a>`);m.addTo(layer);});
   if(clickCb){let mk=null;map.on("click",e=>{if(mk)map.removeLayer(mk);mk=L.marker(e.latlng,{draggable:true}).addTo(map);mk.on("dragend",()=>clickCb(mk.getLatLng(),mk));clickCb(e.latlng,mk);});}
   setTimeout(()=>map.invalidateSize(),300);return map;
 }
+/* GPS: tombol "Lokasi saya" — tengah ke posisi HP + pasang marker (mode setPick utk form) */
+function placePickMarker(map,lat,lng){
+  if(MAPS.pickMk){try{map.removeLayer(MAPS.pickMk);}catch(e){}}
+  const mk=L.marker([lat,lng],{draggable:true}).addTo(map);MAPS.pickMk=mk;
+  PICK.lat=lat;PICK.lng=lng;
+  const el=document.querySelector("#nLL");if(el)el.textContent=lat.toFixed(5)+", "+lng.toFixed(5);
+  try{localStorage.setItem("cr_lastloc",JSON.stringify({lat,lng}));}catch(e){}
+  mk.on("dragend",()=>{const p=mk.getLatLng();PICK.lat=p.lat;PICK.lng=p.lng;
+    const e2=document.querySelector("#nLL");if(e2)e2.textContent=p.lat.toFixed(5)+", "+p.lng.toFixed(5);
+    try{localStorage.setItem("cr_lastloc",JSON.stringify({lat:p.lat,lng:p.lng}));}catch(e){}
+    if(typeof checkDup==="function")checkDup();});
+  if(typeof checkDup==="function")checkDup();
+}
+window.locateMe=(mapId,setPick)=>{
+  if(!navigator.geolocation){toast("GPS tidak didukung perangkat ini","err");return;}
+  toast("📡 Mencari lokasimu…","info");
+  navigator.geolocation.getCurrentPosition(p=>{
+    const lat=p.coords.latitude,lng=p.coords.longitude;
+    try{localStorage.setItem("cr_lastloc",JSON.stringify({lat,lng}));}catch(e){}
+    const map=(MAPS.all||{})[mapId];
+    if(map){map.setView([lat,lng],15);if(setPick)placePickMarker(map,lat,lng);}
+    toast("📍 Lokasi ditemukan","ok");
+  },e=>{toast("GPS gagal ("+e.message+") — klik peta manual ya","err");},
+  {enableHighAccuracy:true,timeout:12000});
+};
+function lastLoc(){try{const l=JSON.parse(localStorage.getItem("cr_lastloc")||"null");if(l&&isFinite(l.lat)&&isFinite(l.lng))return l;}catch(e){}return null;}
 function vDetail(id){
   const r=Store.get(id);if(!r)return `<div class="max-w-3xl mx-auto p-8">${emptyBox(t("notFound"))}</div>`;
   const m=Store.me(),u=Store.db().users.find(x=>x.id===r.user_id);
@@ -189,7 +216,7 @@ function vCreate(editId){
   <div><label class="lbl">${t("description")} *</label><textarea id="nD" class="input" rows="4" placeholder="Ceritakan kondisi, bahaya, sejak kapan…">${esc(r?r.description:"")}</textarea></div>
   <div><label class="lbl">${t("photo")} (maks 2MB, jpg/png)</label><input id="nP" type="file" accept="image/*" class="input"><img id="nPv" class="rounded-xl mt-2 max-h-52 ${r?"":"hidden"} " src="${r?esc(r.photo):""}"><p class="text-xs text-slate-400">Foto tersimpan sebagai data lokal (base64) bila diunggah.</p></div>
   <div><label class="lbl">${t("address")} *</label><input id="nA" class="input" value="${esc(r?r.address:"")}" placeholder="Jl. … No. …"></div>
-  <div><label class="lbl">${t("location")} *</label><div id="pickMap" style="height:300px"></div><p class="text-xs text-slate-500 mt-1">🧭 <span id="nLL">${r?r.lat.toFixed(5)+", "+r.lng.toFixed(5):"klik peta / click map"}</span></p></div>
+  <div><div class="flex items-center justify-between mb-1"><label class="lbl" style="margin:0">${t("location")} *</label><button type="button" class="btn btn-outline btn-sm" onclick="locateMe('pickMap',true)">📍 Lokasi saya</button></div><div id="pickMap" style="height:300px"></div><p class="text-xs text-slate-500 mt-1">🧭 <span id="nLL">${r?r.lat.toFixed(5)+", "+r.lng.toFixed(5):"klik peta / click map"}</span></p></div>
   <div id="dupBox"></div>
   <button class="btn btn-emerald w-full" onclick="submitReport('${r?r.id:""}')">${r?t("save"):t("send")} 🚀</button>
   </div></div>`;
@@ -316,7 +343,8 @@ function afterRender(path,seg,q){
   if(seg[0]==="create-report"||seg[0]==="edit"){
     const r=seg[0]==="edit"?Store.get(decodeURIComponent(seg[1]||"")):null;
     PICK={lat:r?r.lat:null,lng:r?r.lng:null,photo:r?r.photo:""};
-    const map=initMap("pickMap",r?[r]:Store.list().slice(0,10),(ll,mk)=>{PICK.lat=ll.lat;PICK.lng=ll.lng;$("#nLL").textContent=ll.lat.toFixed(5)+", "+ll.lng.toFixed(5);checkDup();});
+    const map=initMap("pickMap",r?[r]:Store.list().slice(0,10),(ll,mk)=>{PICK.lat=ll.lat;PICK.lng=ll.lng;$("#nLL").textContent=ll.lat.toFixed(5)+", "+ll.lng.toFixed(5);try{localStorage.setItem("cr_lastloc",JSON.stringify({lat:ll.lat,lng:ll.lng}));}catch(e){}checkDup();});
+    const last=lastLoc();if(last&&map)map.setView([last.lat,last.lng],13);
     if(r&&window.L){L.marker([r.lat,r.lng]).addTo(map);map.setView([r.lat,r.lng],14);}
     const fp=$("#nP");if(fp)fp.onchange=e=>{const f=e.target.files[0];if(!f)return;if(!f.type.startsWith("image/")){toast("Hanya gambar/only images","err");return;}if(f.size>2*1024*1024){toast("Maks 2MB","err");return;}const rd=new FileReader();rd.onload=()=>{PICK.photo=rd.result;$("#nPv").src=rd.result;$("#nPv").classList.remove("hidden");};rd.readAsDataURL(f);};
     const na=$("#na");if(na)na.onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{$("#naU").value=rd.result;toast("Foto sesudah siap","ok");};rd.readAsDataURL(f);};

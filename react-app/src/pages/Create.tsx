@@ -16,6 +16,7 @@ export default function Create() {
   useEffect(() => {
     const map = L.map('cmap').setView([-6.205, 106.826], 12);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri · OpenStreetMap contributors' }).addTo(map);
+    try { const last = JSON.parse(localStorage.getItem('cr_lastloc') || 'null'); if (last?.lat) map.setView([last.lat, last.lng], 13); } catch {}
     let mk: L.Marker | null = null;
     map.on('click', e => {
       if (mk) map.removeLayer(mk);
@@ -26,6 +27,17 @@ export default function Create() {
     mapEl.current = map;
     return () => { map.remove(); };
   }, []);
+
+  const locate = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(p => {
+      const ll: [number, number] = [p.coords.latitude, p.coords.longitude];
+      mapEl.current?.setView(ll, 15);
+      if (mapEl.current) L.marker(ll).addTo(mapEl.current);
+      setPos(ll);
+      try { localStorage.setItem('cr_lastloc', JSON.stringify({ lat: ll[0], lng: ll[1] })); } catch {}
+    });
+  };
 
   const submit = async () => {
     try {
@@ -60,7 +72,7 @@ export default function Create() {
         <div><label className="text-xs font-bold">Deskripsi *</label><textarea className="input" rows={4} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
         <div><label className="text-xs font-bold">Foto (maks 2MB)</label><input type="file" accept="image/*" className="input" onChange={e => setFile(e.target.files?.[0] ?? null)} /></div>
         <div><label className="text-xs font-bold">Alamat *</label><input className="input" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} /></div>
-        <div><label className="text-xs font-bold">Lokasi (klik peta) *</label><div id="cmap" style={{ height: 300 }} className="rounded-xl" /><p className="text-xs text-slate-500">🧭 {pos ? pos.map(n => n.toFixed(5)).join(', ') : 'klik peta'}</p></div>
+        <div><div className="flex items-center justify-between mb-1"><label className="text-xs font-bold">Lokasi (klik peta) *</label><button type="button" className="btn btn-outline !py-1 text-xs" onClick={locate}>📍 Lokasi saya</button></div><div id="cmap" style={{ height: 300 }} className="rounded-xl" /><p className="text-xs text-slate-500">🧭 {pos ? pos.map(n => n.toFixed(5)).join(', ') : 'klik peta'}</p></div>
         <button className="btn btn-emerald w-full" onClick={submit}>Kirim Laporan 🚀</button>
       </div>
     </div>
